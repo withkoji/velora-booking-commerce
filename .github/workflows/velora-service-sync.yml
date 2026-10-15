@@ -1,0 +1,34 @@
+name: VELORA Shopify to Zite
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Write catalog changes to Zite (otherwise preview counts only)
+        type: boolean
+        default: false
+  schedule:
+    - cron: '23 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: velora-shopify-zite
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.event_name == 'workflow_dispatch' || vars.VELORA_SYNC_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Verify Node runtime
+        run: node --version
+      - name: Test sync
+        run: node --test integrations/velora-shopify-zite/sync.test.mjs
+      - name: Sync selected services
+        env:
+          SHOPIFY_SHOP_DOMAIN: ${{ vars.SHOPIFY_SHOP_DOMAIN }}
+          SHOPIFY_SERVICE_QUERY: ${{ vars.SHOPIFY_SERVICE_QUERY }}
+          SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ADMIN_ACCESS_TOKEN }}
+          ZITE_API_KEY: ${{ secrets.ZITE_API_KEY }}
+          DRY_RUN: ${{ (github.event_name == 'schedule' || inputs.apply) && 'false' || 'true' }}
+        run: node integrations/velora-shopify-zite/sync.mjs
