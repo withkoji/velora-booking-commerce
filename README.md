@@ -1,83 +1,73 @@
-VELORA Booking Commerce
+# VELORA Booking Commerce
 
-Public integration architecture for the VELORA By SJ wellness marketplace.
+Public architecture and integration documentation for **VELORA By SJ**, a wellness-service marketplace connecting customer discovery, provider availability, appointment booking, commerce, payments, and CRM lifecycle automation.
 
-VELORA provides a unified customer journey for discovering wellness services, finding providers, selecting studio or mobile appointments, booking services, paying required deposits, and managing appointments.
+> **Core rule:** One customer journey. One booking. One authoritative payment path.
 
-System Architecture
+## Overview
 
-VELORA uses several specialized platforms rather than duplicating commerce, booking, and CRM responsibilities.
+VELORA Booking Commerce coordinates multiple systems while keeping each platform responsible for its own authoritative records.
 
-Platform	Primary Responsibility
-VELORA By SJ / Zite	Customer marketplace, provider discovery, customer experience
-VELORA Operations / Zite	Provider and administrative operations
-Shopify	Products, customers, checkout, payments, orders, and gift cards
-Apntly	Appointment scheduling, availability, deposit configuration, and booking references
-Fillout / Zite Workflow	Secure synchronization of approved commerce events
-HubSpot	CRM and lifecycle automation
-Stripe Connect	Designated marketplace/provider payment and payout workflows
+| System | Responsibility |
+| --- | --- |
+| **VELORA By SJ / Zite** | Public marketplace, service discovery, provider profiles, guest experience |
+| **VELORA Operations / Zite** | Internal provider, booking, membership, commission, payout, and integration operations |
+| **Shopify** | Products, customers, cart, checkout, payments, orders, gift cards, order status |
+| **Apntly** | Appointment scheduling, provider availability, deposit configuration, booking confirmation, booking reference/code |
+| **Fillout / Zite Workflow** | Secure synchronization of approved Shopify events into VELORA operations |
+| **HubSpot** | CRM and customer/provider lifecycle automation |
+| **Stripe Connect** | Designated marketplace/provider payment and payout workflows only |
 
-Customer Booking Flow
+VELORA does **not** duplicate Shopify orders or treat a cart event as proof of payment or appointment confirmation.
 
-VELORA By SJ
-      ↓
-Find Service
-      ↓
-Find Provider
-      ↓
-Studio / Mobile / In-Home
-      ↓
-Select Date & Time
-      ↓
-Guest Details
-      ↓
-Review Service Price
-      ↓
-Review 50% Deposit
-      ↓
-Shopify / Apntly Checkout
-      ↓
-Payment Verification
-      ↓
-Appointment Verification
-      ↓
-Booking Confirmation
-      ↓
-Booking Code
-      ↓
-Appointment
-      ↓
-Remaining Balance
-      ↓
-Completed
+## Customer Booking Journey
 
-Creating a cart does not constitute a confirmed appointment.
+```text
+Home
+  → Find Service
+  → Find Provider
+  → Choose Studio / Mobile / In-Home
+  → Select Date & Time
+  → Enter Guest Details
+  → Review Full Service Price
+  → Review 50% Deposit
+  → Review Remaining Balance
+  → Continue to Shopify / Apntly Checkout
+  → Deposit Payment
+  → Shopify Order Verification
+  → Apntly Booking Verification
+  → Booking Confirmation
+  → Booking Code
+  → Appointment
+  → Staff/Provider Verifies Booking Code
+  → Remaining Balance Confirmed
+  → Appointment Completed
+```
 
-Payment and appointment confirmation must be verified through the appropriate authoritative systems before a booking is marked confirmed.
+**Cart creation alone never confirms an appointment.** A booking becomes confirmed only after the required payment state and appointment record have been verified through their authoritative systems.
 
-Services
+## Services
 
-VELORA supports wellness services including:
-
-* Swedish Massage
-* Deep Tissue Massage
-* Hot Stone Massage
-* Prenatal Massage
-* Therapeutic Bodywork
-* Relaxation & Stress Relief
-* Mobile / In-Home Massage
-* Couples Massage
-* Multi-session Wellness Packages
-* Gift Cards
-
-Appointment services can use a 50% booking deposit, with the remaining balance tracked separately.
+| Service | Duration | Full Price | 50% Deposit | Remaining Balance |
+| --- | ---: | ---: | ---: | ---: |
+| Swedish Massage | 60 min | $120 | $60 | $60 |
+| Deep Tissue Massage | 60 min | $140 | $70 | $70 |
+| Hot Stone Massage | 75 min | $160 | $80 | $80 |
+| Prenatal Massage | 60 min | $130 | $65 | $65 |
+| Therapeutic Bodywork Session | 60 min | $150 | $75 | $75 |
+| Relaxation & Stress Relief | 60 min | $120 | $60 | $60 |
+| Mobile Massage — In-Home | 60 min | $175 | $87.50 | $87.50 |
+| Couples Massage | 60 min / 2 guests | $240 | $120 | $120 |
+| Wellness Package — 3 Sessions | Package | $330 | $165 | $165 |
+| Gift Cards | — | Starting at $50 | Not applicable | Not applicable |
 
 Gift-card purchases are excluded from appointment-deposit calculations.
 
-Booking Lifecycle
+## Booking State Machine
 
-The application supports a controlled booking lifecycle:
+Supported booking states:
 
+```text
 Draft
 → Cart Created
 → Checkout Started
@@ -90,121 +80,188 @@ Draft
 → Balance Due
 → Paid in Full
 → Completed
+```
 
-Additional lifecycle states include:
+Additional terminal or exception states:
 
-Rescheduled
-Cancelled
-Refunded
+- Rescheduled
+- Cancelled
+- Refunded
 
-Important state rules:
+### State invariants
 
-* Cart Created does not equal Appointment Confirmed.
-* Deposit Pending does not equal Deposit Paid.
-* Payment success must be independently verified.
-* Appointment confirmation must be independently verified.
-* Webhook processing should be idempotent.
+- `Cart Created` ≠ `Appointment Confirmed`
+- `Deposit Pending` ≠ `Deposit Paid`
+- Payment success must be verified from an authoritative payment/order event.
+- Appointment confirmation must be verified against the appointment system.
+- Payment and booking webhooks must be idempotent.
+- Duplicate events must not create duplicate bookings, orders, payments, commissions, or payouts.
 
-Shopify Integration
+## Shopify — Commerce System of Record
 
-Shopify serves as the commerce system of record for:
+Shopify owns:
 
-* Products
-* Service products
-* Customers
-* Cart
-* Checkout
-* Payments
-* Orders
-* Gift cards
-* Order status
+- Products and service products
+- Customers
+- Cart and checkout
+- Payment processing
+- Orders and order status
+- Gift cards
 
-VELORA stores only the external Shopify identifiers and operational information required to associate marketplace activity with authoritative Shopify records.
+VELORA may retain Shopify identifiers required for synchronization, including:
 
-VELORA must not create duplicate Shopify orders.
+```text
+shopify_customer_id
+shopify_product_id
+shopify_variant_id
+shopify_cart_id
+shopify_checkout_reference
+shopify_order_id
+shopify_order_number
+shopify_payment_status
+```
 
-Apntly Integration
+These references associate VELORA operational records with Shopify. They do not replace Shopify's authoritative commerce records.
 
-Apntly manages supported appointment functionality, including:
+## Apntly — Appointment System
 
-* Service booking
-* Provider availability
-* Appointment dates
-* Appointment times
-* Deposit configuration
-* Booking confirmation
-* Booking references/codes
+Apntly manages supported appointment functions:
 
-External booking identifiers can be associated with the corresponding VELORA booking record.
+- Service booking
+- Provider availability
+- Appointment date and time
+- 50% deposit configuration
+- Booking confirmation
+- Booking reference/code
 
-Payment Model
+VELORA can associate external appointment identifiers with operational booking records:
+
+```text
+apntly_booking_id
+apntly_service_id
+apntly_provider_id
+apntly_booking_status
+booking_code
+```
+
+## Shopify Webhook Processing
+
+The existing synchronization path begins with Shopify commerce activity and feeds approved booking data into the VELORA operations layer.
+
+For a cart-creation event, the integration should:
+
+1. Verify the webhook signature.
+2. Reject invalid requests.
+3. Extract the Shopify cart identifier.
+4. Check whether the event/cart has already been processed.
+5. Create or update the pending booking/cart record.
+6. Match the service/product.
+7. Match the provider when available.
+8. Store the full service price.
+9. Store the expected 50% deposit.
+10. Store the remaining balance.
+11. Set the booking to `Cart Created` or `Deposit Pending`.
+12. **Do not** mark the payment successful.
+13. **Do not** confirm the appointment.
+
+An authoritative successful Shopify order/payment event should then locate the pending booking, verify the expected amount, record the verified deposit, transition the booking to `Deposit Paid`, verify the corresponding Apntly appointment, and only then transition it to `Appointment Confirmed` and store the booking reference/code.
+
+## Payment Model
 
 For eligible appointment services:
 
-Deposit = Service Price × 50%
-Remaining Balance = Service Price − Verified Deposit
+```text
+deposit_percentage = 50
+deposit_amount = service_price × 0.50
+remaining_balance = service_price − verified_deposit
+```
 
-Payment records distinguish between:
+Operational payment records may track:
 
-* Expected deposit
-* Verified deposit payment
-* Remaining balance
-* Verified balance payment
-* Refunds
-* Payment status
+```text
+service_price
+deposit_percentage
+deposit_amount
+deposit_paid
+deposit_paid_at
+remaining_balance
+remaining_balance_paid
+payment_source
+payment_status
+shopify_order_id
+stripe_payment_id
+refund_amount
+```
 
-Financial state changes must originate from verified payment events rather than browser activity or cart creation.
+Gift cards do not use the appointment-deposit calculation.
 
-Payment Routing
+### Payment routing
 
-A booking uses one designated payment path.
+Every booking has exactly one designated payment source:
 
-Shopify / Apntly
+- `shopify_apntly` — existing VELORA booking flow
+- `stripe_connect` — specifically configured marketplace/provider payment flows
 
-or, for specifically configured marketplace workflows:
+The same booking must never be processed through both payment systems.
 
-Stripe Connect
+## Provider Marketplace
 
-A single booking must never be processed simultaneously through both payment paths.
+Guests can discover providers by supported marketplace criteria such as:
 
-Provider Marketplace
+- State
+- City
+- County
+- Service
+- Studio availability
+- Mobile availability
+- In-home availability
+- Available today
+- Same-day availability
 
-Customers can discover providers using criteria such as:
+Approved provider profiles may expose fields such as:
 
-* State
-* City
-* County
-* Service
-* Studio availability
-* Mobile availability
-* In-home availability
-* Available today
-* Same-day availability
+```text
+provider_name
+professional_title
+profile_photo
+bio
+city
+county
+state
+service_area
+studio_available
+mobile_available
+home_service_available
+available_today
+same_day_booking
+next_available
+membership_status
+```
 
-Provider profiles may contain approved public information such as professional title, biography, service area, appointment options, and next availability.
+VELORA must not invent, infer, or display unverified licenses, certifications, or professional credentials.
 
-VELORA does not invent or infer provider licenses, certifications, or professional credentials.
+## Mobile / In-Home Bookings
 
-Mobile Appointments
+Mobile appointments can collect the information required to perform the appointment, including guest contact information, service, provider, appointment date/time, authorized service address, and access instructions.
 
-Mobile and in-home appointments may require an authorized service location and access instructions.
+A mobile-service address is **appointment information**. It must not automatically be reused as a physical-product shipping address.
 
-Service-location information is appointment data and must be handled accordingly.
+## Provider Membership
 
-It should not automatically be treated as a physical-product shipping address.
+Provider onboarding follows:
 
-Provider Membership
-
-The provider onboarding lifecycle supports:
-
+```text
 Apply
-→ Administrative Review
+→ Admin Review
 → Approved
-→ Free Trial
-→ Active Membership
+→ 30-Day Free Trial
+→ $25/Month Subscription
+→ Active Provider
+```
 
-Operational membership states can include:
+Supported membership states:
 
+```text
 Pending Approval
 Approved
 Trial
@@ -212,52 +269,68 @@ Active
 Past Due
 Suspended
 Cancelled
+```
 
-Marketplace Commission
+## Marketplace Commission
 
-Eligible marketplace transactions may support platform commission accounting.
+Eligible marketplace bookings use a **25% platform commission**.
 
-Commission and provider earnings must be calculated from verified transactions, never from cart creation or an unverified checkout.
+Operational accounting may track:
 
-The operations layer can track:
+```text
+gross_service_amount
+platform_commission_rate = 25%
+platform_commission_amount
+provider_earnings
+refund_adjustments
+payout_status
+```
 
-* Gross eligible service amount
-* Commission rate
-* Platform commission
-* Provider earnings
-* Refund adjustments
-* Payout status
+Final commission and provider earnings must be calculated from a **verified payment transaction**, never from cart creation or an unverified checkout.
 
-VELORA Operations
+## VELORA Operations
 
-The internal operations application manages authorized operational records including:
+The internal operations application is responsible for authorized management of:
 
-* Providers
-* Provider applications
-* Customers
-* Services
-* Availability
-* Appointments
-* Bookings
-* Deposits
-* Outstanding balances
-* Shopify order references
-* Apntly booking references
-* Booking codes
-* Provider memberships
-* Commissions
-* Provider earnings
-* Payout statuses
-* Webhook events
-* Integration failures
-* CRM events
+- Providers and provider applications
+- Customers
+- Services and availability
+- Appointments and bookings
+- Deposits and remaining balances
+- Shopify order references
+- Apntly booking references and booking codes
+- Provider memberships
+- Platform commissions
+- Provider earnings and payout status
+- Webhook events
+- Failed integrations
+- CRM events
 
-Internal operational data is not exposed through the public marketplace.
+Suggested operational dashboard metrics include:
 
-CRM Integration
+- Bookings Today
+- Upcoming Bookings
+- Deposits Paid
+- Deposits Pending
+- Balances Due
+- Active Providers
+- Providers on Trial
+- Past-Due Memberships
+- Marketplace Revenue
+- Provider Earnings
+- Failed Webhook Events
 
-Approved lifecycle events can be routed to HubSpot, including:
+## Provider Dashboard & Authorization
 
+Providers should receive access only to records they are authorized to view. A provider dashboard may include today's appointments, upcoming appointments, requested service, studio/mobile status, authorized mobile appointment address, guest name, booking code, deposit status, balance due, appointment status, and provider earnings.
+
+Provider-facing clients must never receive Shopify administrative credentials or other server-side secrets.
+
+## HubSpot CRM Events
+
+Permitted lifecycle events may include:
+
+```text
 New Guest
 New Provider Application
 Provider Approved
@@ -268,62 +341,15 @@ Appointment Completed
 Provider Trial Started
 Provider Membership Activated
 Follow-Up Required
+```
 
-Only information necessary for the CRM workflow should be transmitted.
+Only data required for the CRM workflow should be transmitted. API secrets, full payment credentials, and unnecessary sensitive information must not be sent to HubSpot.
 
-Security
+## Customer Experience
 
-Security boundaries are mandatory throughout this project.
+Primary public navigation:
 
-Never commit or expose:
-
-Shopify Admin API access tokens
-Client secrets
-Webhook signing secrets
-Stripe secret keys
-Apntly private credentials
-Zite credentials
-HubSpot private access tokens
-CI/CD credentials
-Environment secrets
-
-Secrets belong in approved server-side secret-management or environment-variable systems.
-
-Never place secrets in:
-
-* Git repositories
-* Public frontend JavaScript
-* HTML
-* Query-string URLs
-* Browser storage
-* Customer-readable database fields
-* Documentation examples
-
-Previously exposed credentials should be revoked and replaced rather than reused.
-
-Use .env.example files containing variable names only, never real values.
-
-Webhook Principles
-
-Integration endpoints should:
-
-1. Authenticate or verify incoming events.
-2. Reject invalid requests.
-3. Validate required data.
-4. identify the external event or transaction.
-5. Prevent duplicate processing.
-6. Match the appropriate booking.
-7. Update only permitted fields.
-8. Preserve authoritative external identifiers.
-9. Record processing status.
-10. Surface failures for administrative review.
-
-All payment-related webhook processing should be idempotent.
-
-Customer Experience
-
-The public experience is organized around:
-
+```text
 Home
 Book a Service
 Available Today
@@ -334,26 +360,66 @@ Gift Cards
 Wellness
 My Appointments
 Contact
+```
 
-The goal is a continuous VELORA experience even though commerce, appointment scheduling, marketplace operations, and CRM automation are handled by separate systems.
+Recommended homepage sequence:
 
-Core Integration Principle
+1. Hero
+2. Find a Service
+3. Available Today
+4. Featured Services
+5. Provider Directory
+6. Studio or Mobile
+7. Wellness Package
+8. Gift Cards
+9. How Booking Works
+10. Wellness Content
+11. About VELORA
+12. Contact
+13. Book Now CTA
 
-One customer journey. One booking. One authoritative payment path.
+## Security Requirements
 
-VELORA should prevent:
+This is a **public repository**. Secrets and private credentials must never be committed.
 
-* Duplicate bookings
-* Duplicate orders
-* Duplicate payments
-* Premature appointment confirmation
-* Unauthorized provider data access
-* Exposure of administrative credentials
+Never expose:
 
-Repository Structure
+- Shopify Admin API access tokens
+- Client secrets
+- Webhook signing secrets
+- Stripe secret keys
+- Apntly private credentials
+- Zite credentials
+- HubSpot private access tokens
+- CI/CD tokens
+- Production environment secrets
 
-Recommended structure:
+Secrets must remain server-side in approved secret-management or environment-variable systems. Never place them in public frontend code, HTML, URLs, browser storage, customer-readable fields, documentation examples, commits, issues, or pull requests.
 
+If a credential has previously been exposed, revoke/rotate it rather than reusing it.
+
+An `.env.example` file may document required environment-variable **names only** and must never contain production values.
+
+## Integration Design Principles
+
+All integrations should follow these rules:
+
+1. Verify authenticity before processing external events.
+2. Validate required fields and reject malformed input.
+3. Use stable external identifiers for reconciliation.
+4. Make webhook handlers idempotent.
+5. Separate pending, verified, and completed states.
+6. Never infer payment success from frontend activity.
+7. Never infer appointment confirmation from cart creation.
+8. Enforce record-level authorization for guests and providers.
+9. Log integration failures without logging secrets.
+10. Route failed or incomplete events for administrative review.
+
+## Repository Structure
+
+As implementation files are added, the repository can follow this structure:
+
+```text
 velora-booking-commerce/
 ├── README.md
 ├── .gitignore
@@ -369,30 +435,29 @@ velora-booking-commerce/
 ├── config/
 ├── docs/
 └── tests/
+```
 
-Development Status
+## Development Status
 
-VELORA By SJ and VELORA Operations are existing applications.
+The public repository currently documents the intended VELORA booking-commerce architecture. The existing **VELORA By SJ** application serves the guest/customer marketplace, while **VELORA Operations** serves internal provider and administrative workflows.
 
-Current integration work focuses on establishing reliable synchronization among the marketplace, Shopify commerce, appointment scheduling, CRM, and authorized provider operations.
+Direct Zite build-tool availability is separate from deployed app availability. Integration changes should be applied through authorized development tooling or the Zite editor without exposing private credentials in this repository.
 
-Direct Zite build-tool availability is environment/account dependent and is not required for the deployed applications themselves to continue operating.
+## Contributing
 
-Contributing
+Before submitting a change:
 
-Before submitting changes:
+- Never commit production credentials or customer secrets.
+- Preserve the system-of-record boundaries described above.
+- Preserve webhook idempotency.
+- Add tests for payment and booking-state transitions when implementation code is introduced.
+- Do not treat cart creation as payment confirmation.
+- Do not treat payment initiation as payment success.
+- Validate authorization before returning guest/provider records.
+- Document environment-variable names without documenting their secret values.
 
-* Never include production credentials.
-* Keep commerce and booking responsibilities separated.
-* Preserve idempotency for webhook handlers.
-* Add tests for payment and booking-state transitions.
-* Do not treat cart creation as payment confirmation.
-* Do not treat payment initiation as payment success.
-* Validate authorization before returning provider or customer records.
-* Document new environment variables without supplying their values.
-
-License
+## License & Brand Notice
 
 Copyright © VELORA By SJ. All rights reserved.
 
-This repository is publicly visible for development and integration documentation. Public visibility does not grant permission to use VELORA branding, customer information, provider information, or proprietary business assets.
+This repository is publicly visible for architecture and integration development. Public visibility does not grant permission to use VELORA branding, customer information, provider information, proprietary business assets, or private operational data.
