@@ -1,0 +1,13 @@
+query VeloraServices($after: String, $query: String!) {
+  shop { myshopifyDomain currencyCode }
+  products(first: 50, after: $after, query: $query, sortKey: ID) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id title description productType status
+      variants(first: 100) {
+        pageInfo { hasNextPage }
+        nodes { id title price }
+      }
+    }
+  }
+}
