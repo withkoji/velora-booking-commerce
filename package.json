@@ -1,0 +1,29 @@
+{
+  "name": "@vivia-velora/platform",
+  "version": "0.1.0",
+  "private": false,
+  "description": "VIVIA Rentals and VELORA By SJ platform foundation.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vivia-velora/-user7816120825.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "package": "npm pack --pack-destination dist"
+  },
+  "files": [
+    "api/",
+    "docs/",
+    "integrations/",
+    "repository/",
+    "velora/",
+    "vivia/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
