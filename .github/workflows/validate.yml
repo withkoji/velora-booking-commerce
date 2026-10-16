@@ -1,0 +1,47 @@
+name: VELORA Validation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: velora-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify Node runtime
+        run: node --version
+
+      - name: Run repository tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t tests < <(find integrations -type f \( -name '*.test.mjs' -o -name '*.test.js' \) 2>/dev/null | sort)
+          if [ ${#tests[@]} -eq 0 ]; then
+            echo 'No integration tests found yet.'
+            exit 0
+          fi
+          node --test "${tests[@]}"
+
+      - name: Validate public repository secret hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nE '(SHOPIFY_ADMIN_ACCESS_TOKEN|ZITE_API_KEY|STRIPE_SECRET_KEY|SHOPIFY_WEBHOOK_SECRET|HUBSPOT_ACCESS_TOKEN)[[:space:]]*=[[:space:]]*[^${][^[:space:]]+' -- ':!*.md' ':!.github/workflows/*'; then
+            echo 'Potential hard-coded secret assignment detected.'
+            exit 1
+          fi
+          echo 'No obvious hard-coded integration secret assignments detected.'
