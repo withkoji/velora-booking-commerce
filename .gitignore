@@ -147,3 +147,10 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Stripe receiver local dependencies and private event receipts
+.bundle/
+vendor/bundle/
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal

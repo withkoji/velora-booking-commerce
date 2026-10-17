@@ -1,0 +1,23 @@
+name: Stripe sandbox receiver tests
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [integration/stripe-deployment]
+permissions:
+  contents: read
+jobs:
+  ruby-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: integrations/stripe-server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: integrations/stripe-server
+      - run: bundle exec ruby -Itest test/app_test.rb
