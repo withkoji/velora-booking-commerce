@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: velora-stripe-sandbox
+    runtime: ruby
+    plan: starter
+    branch: integration/stripe-deployment
+    rootDir: integrations/stripe-server
+    buildCommand: bundle install
+    startCommand: bundle exec puma -b tcp://0.0.0.0:$PORT -t 1:5 config.ru
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    disk:
+      name: stripe-event-receipts
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: RUBY_VERSION
+        value: 3.3.10
+      - key: RACK_ENV
+        value: production
+      - key: STRIPE_MODE
+        value: sandbox
+      - key: EVENT_DATABASE_PATH
+        value: /var/data/stripe-events.sqlite3
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false

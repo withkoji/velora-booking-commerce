@@ -1,5 +1,9 @@
 # Stripe Integration TODO
 
+## Integration branch update
+
+`integration/stripe-deployment` now includes a Ruby/Sinatra sandbox webhook receipt service. See `docs/stripe-deployment-setup.md` for deployment and remaining work. It does not expose Checkout creation, create connected accounts, collect payments, or synchronize booking state. The historical configuration below is not an implemented configuration or an approved production policy. Automatic tax requires verified registrations, and the listed branding and policy text require review.
+
 ## Status
 
 Scenario B was detected: no existing Stripe Checkout Session API call is present in the repository.
