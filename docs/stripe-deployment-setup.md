@@ -1,6 +1,6 @@
 # VELORA Stripe sandbox receiver
 
-The supplied Sinatra sample has been adapted into a sandbox-only, durable webhook receipt service at `integrations/stripe-server`. It is not a checkout or booking-fulfillment application. No hosting resource, Stripe destination, or customer payment has been created by this change.
+The supplied Sinatra sample has been adapted into a sandbox-only, durable webhook receipt service at `integrations/stripe-server`. A sandbox-only Checkout endpoint has since been added; see [STRIPE_INTEGRATION_TODO.md](../STRIPE_INTEGRATION_TODO.md) for all remaining Checkout setup. Booking and membership fulfillment are not implemented. No hosting resource, Stripe destination, or customer payment has been created by this change.
 
 ## Repository and deployment
 - Repository: `withkoji/velora-booking-commerce`
@@ -9,6 +9,7 @@ The supplied Sinatra sample has been adapted into a sandbox-only, durable webhoo
 - Render Blueprint: `integrations/stripe-server/render.yaml`
 - Health route: `GET /health`
 - Snapshot webhook route: `POST /api/webhook`
+- Sandbox Checkout route: `POST /api/create-checkout-session` (setup in the TODO linked above)
 
 The Stripe SDK repository and its private-preview branch are libraries, not the VELORA application. This implementation uses the stable Ruby gem.
 
@@ -17,7 +18,7 @@ Create a Blueprint from the application repository and integration branch, selec
 
 The Blueprint supplies sandbox mode, the persistent disk path and the start command. Set `STRIPE_WEBHOOK_SECRET` in Render's secret environment settings to the signing secret for this exact sandbox destination. The service refuses to start without it. `RENDER_EXTERNAL_HOSTNAME` supplies host authorization automatically; add `PUBLIC_HOSTNAME` only if using a custom domain. Set `STRIPE_ALLOWED_ACCOUNTS` to an approved comma-separated account allowlist only if receiving connected-account events; the default accepts platform events only.
 
-The receiver does not call the Stripe API and does not need a Stripe API key. Do not add live keys. It rejects every event with `livemode: true` and cannot be enabled for live fulfillment by an environment switch.
+Webhook receipt handling does not need a Stripe API key. The optional Checkout route requires a sandbox STRIPE_SECRET_KEY and DOMAIN as documented in the TODO. Do not add live keys. It rejects every event with `livemode: true` and cannot be enabled for live fulfillment by an environment switch.
 
 After deployment, the endpoint URL is the host's actual HTTPS URL followed by `/api/webhook`. Do not point a destination to this URL before the server is running. Do not replace a working production destination with this sandbox-only receiver.
 

@@ -48,6 +48,43 @@ module Velora
       JSON.generate(status: "ok", mode: "sandbox", booking_sync: "not_implemented")
     end
 
+    post "/api/create-checkout-session" do
+      # This receiver has no customer authorization/fulfillment layer yet.
+      # Keep Checkout sandbox-only; prices and redirects are server-owned.
+      key = ENV["STRIPE_SECRET_KEY"].to_s
+      halt 503, JSON.generate(error: "Sandbox Checkout not configured") unless
+        ENV.fetch("STRIPE_MODE", "sandbox") == "sandbox" && key.match?(/\A(?:sk|rk)_test_/)
+
+      client = Stripe::StripeClient.new(key)
+      domain = ENV.fetch("DOMAIN", "http://localhost:3000")
+      mode = "subscription" # Recurring VELORA Wellness Membership.
+      session_params = {
+        ui_mode: "hosted", # Gemfile pins stripe ~> 19.6 (< 21.0.0).
+        mode: mode,
+        billing_address_collection: "required",
+        phone_number_collection: { enabled: true },
+        automatic_tax: { enabled: true },
+        allow_promotion_codes: false,
+        submit_type: "auto",
+        tax_id_collection: { enabled: true, required: "if_supported" },
+        consent_collection: { terms_of_service: "required" },
+        custom_text: { terms_of_service_acceptance: { message: "t" } },
+        name_collection: { individual: { enabled: true } },
+        locale: "en",
+        saved_payment_method_options: { payment_method_save: "enabled" },
+        integration_identifier: "hosted_mobile_app_0002",
+        origin_context: "mobile_app",
+        success_url: "#{domain}/success?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url: domain,
+        line_items: [{ price: "price_...", quantity: 1 }]
+      }
+      session_params[:payment_method_collection] = "always" if mode == "subscription"
+      session = client.v1.checkout.sessions.create(session_params)
+      redirect session.url, 303
+    rescue Stripe::StripeError
+      halt 502, JSON.generate(error: "Checkout unavailable; review server configuration")
+    end
+
     post "/api/webhook" do
       secret = settings.signing_secret
       halt 503, JSON.generate(error: "Webhook not configured") unless secret && !secret.empty? && settings.event_store
