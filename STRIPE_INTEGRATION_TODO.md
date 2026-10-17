@@ -4,6 +4,8 @@ This is the single source of truth for remaining Checkout setup.
 
 ## Status
 
+October 17 configuration alignment: existing Checkout Session parameters now match the attached Checkout Studio Field Intents, including branding. Only Session parameters and this setup checklist were changed. Ruby is unavailable in the editing environment, so syntax and regression tests were not run; run the test command below and verify a real sandbox Session before release.
+
 Scenario B: a scan of the repository found no Checkout Session creation call. A minimal `POST /api/create-checkout-session` endpoint now uses the existing Ruby/Sinatra server and StripeClient. No new framework, middleware, webhook handler, or datastore was added.
 
 The endpoint creates a subscription Session for the customer Wellness Membership and redirects to hosted Checkout with HTTP 303. It is sandbox-only: missing keys and live keys are rejected before any API call. This is a test integration, not a production booking or membership fulfillment system. Existing Shopify/Apntly bookings retain their designated payment route.
@@ -48,11 +50,15 @@ These are the exact Checkout Studio settings, with the requested SDK-specific ui
 | custom_text.terms_of_service_acceptance.message | `t` |
 | name_collection.individual.enabled | `true` |
 | locale | `en` |
-| saved_payment_method_options.payment_method_save | `enabled` |
+| branding_settings.background_color | `#0C0702` |
+| branding_settings.button_color | `#5B4D31` |
+| branding_settings.font_family | `default` |
+| branding_settings.border_style | `rounded` |
+| branding_settings.icon | file `file_1URKb8HHtpUU8BercuOZWrYp` |
 | integration_identifier | `hosted_mobile_app_0002` |
 | origin_context | `mobile_app` |
 
-The text `t` is preserved exactly as supplied, not substituted with an invented policy. Review it in Checkout Studio before public use. No old branding settings or other unrequested Session parameters are carried forward. The Stripe API version is not explicitly set. There is no Gemfile.lock in the repository; dependency resolution and actual API acceptance must be verified in the sandbox. If upgrading to SDK 21+, change ui_mode to hosted_page according to the requested versioning rule.
+The text `t` is preserved exactly as supplied, not substituted with an invented policy. Review it in Checkout Studio before public use. The supplied branding settings are included exactly; the unrequested saved-payment-method option is removed. Confirm the icon file exists in the same sandbox account used by the endpoint. The Stripe API version is not explicitly set. There is no Gemfile.lock in the repository; dependency resolution and actual API acceptance must be verified in the sandbox. If upgrading to SDK 21+, change ui_mode to hosted_page according to the requested versioning rule.
 
 ## Setup and Next Steps
 
