@@ -1,5 +1,6 @@
 ENV["RACK_ENV"] = "test"
 require "minitest/autorun"
+require "minitest/mock"
 require "rack/test"
 require "tmpdir"
 require "openssl"
@@ -187,12 +188,81 @@ class WebhookTest < Minitest::Test
   end
 
   def test_public_management_routes_are_not_exposed
-    %w[/api/create-product /api/create-connect-account /api/create-account-link /api/create-checkout-session].each do |path|
+    %w[/api/create-product /api/create-connect-account /api/create-account-link].each do |path|
       post path, "{}", { "CONTENT_TYPE" => "application/json" }
       assert_equal 404, last_response.status
     end
     get "/api/account-status/acct_fixture"
     assert_equal 404, last_response.status
+  end
+
+  def with_checkout_environment(key: nil, mode: "sandbox")
+    names = %w[STRIPE_SECRET_KEY STRIPE_MODE DOMAIN]
+    previous = names.to_h { |name| [name, ENV[name]] }
+    key ? ENV["STRIPE_SECRET_KEY"] = key : ENV.delete("STRIPE_SECRET_KEY")
+    ENV["STRIPE_MODE"] = mode
+    ENV["DOMAIN"] = "https://checkout.example.invalid"
+    yield
+  ensure
+    previous.each { |name, value| value ? ENV[name] = value : ENV.delete(name) }
+  end
+
+  def test_checkout_fails_closed_without_test_key
+    [nil, "sk_live_fixture", "rk_live_fixture"].each do |key|
+      with_checkout_environment(key: key) do
+        Stripe::StripeClient.stub(:new, ->(*) { flunk "Must not call Stripe" }) do
+          post "/api/create-checkout-session"
+          assert_equal 503, last_response.status
+        end
+      end
+    end
+    with_checkout_environment(key: "sk_test_fixture", mode: "live") do
+      post "/api/create-checkout-session"
+      assert_equal 503, last_response.status
+    end
+  end
+
+  def test_checkout_creates_server_owned_subscription_and_redirects
+    captured = nil
+    sessions = Object.new
+    sessions.define_singleton_method(:create) do |params|
+      captured = params
+      Struct.new(:url).new("https://checkout.stripe.com/c/pay/cs_test_fixture")
+    end
+    checkout = Struct.new(:sessions).new(sessions)
+    client = Struct.new(:v1).new(Struct.new(:checkout).new(checkout))
+    with_checkout_environment(key: "sk_test_fixture") do
+      Stripe::StripeClient.stub(:new, ->(key) { assert_equal "sk_test_fixture", key; client }) do
+        post "/api/create-checkout-session", { price: "price_attacker", success_url: "https://attacker.invalid" }
+        assert_equal 303, last_response.status
+        assert_equal "https://checkout.stripe.com/c/pay/cs_test_fixture", last_response.headers["location"]
+      end
+    end
+    assert_equal "subscription", captured[:mode]
+    assert_equal "hosted", captured[:ui_mode]
+    assert_equal "always", captured[:payment_method_collection]
+    assert_equal [{ price: "price_...", quantity: 1 }], captured[:line_items]
+    assert_equal "https://checkout.example.invalid/success?session_id={CHECKOUT_SESSION_ID}", captured[:success_url]
+    assert_equal "https://checkout.example.invalid", captured[:cancel_url]
+    assert_equal "t", captured.dig(:custom_text, :terms_of_service_acceptance, :message)
+    assert_equal true, captured.dig(:automatic_tax, :enabled)
+    assert_equal "if_supported", captured.dig(:tax_id_collection, :required)
+    assert_equal "hosted_mobile_app_0002", captured[:integration_identifier]
+    assert_equal "mobile_app", captured[:origin_context]
+    assert_equal false, captured[:allow_promotion_codes]
+  end
+
+  def test_checkout_api_errors_do_not_expose_details
+    sessions = Object.new
+    def sessions.create(*) = raise(Stripe::StripeError, "sensitive provider detail")
+    client = Struct.new(:v1).new(Struct.new(:checkout).new(Struct.new(:sessions).new(sessions)))
+    with_checkout_environment(key: "rk_test_fixture") do
+      Stripe::StripeClient.stub(:new, client) do
+        post "/api/create-checkout-session"
+        assert_equal 502, last_response.status
+        refute_includes last_response.body, "sensitive provider detail"
+      end
+    end
   end
 
   def test_thin_destination_cannot_silently_accept_unprocessed_events
