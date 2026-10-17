@@ -71,7 +71,13 @@ module Velora
         custom_text: { terms_of_service_acceptance: { message: "t" } },
         name_collection: { individual: { enabled: true } },
         locale: "en",
-        saved_payment_method_options: { payment_method_save: "enabled" },
+        branding_settings: {
+          background_color: "#0C0702",
+          button_color: "#5B4D31",
+          font_family: "default",
+          border_style: "rounded",
+          icon: { type: "file", file: "file_1URKb8HHtpUU8BercuOZWrYp" }
+        },
         integration_identifier: "hosted_mobile_app_0002",
         origin_context: "mobile_app",
         success_url: "#{domain}/success?session_id={CHECKOUT_SESSION_ID}",
