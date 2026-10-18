@@ -79,7 +79,7 @@ No payment method allowlist, unrequested saved-payment-method option, broken bra
 
 ## Internal configuration monitor / AI connection
 
-The built-in rule checks run on every Checkout request. `GET /api/configuration-status` is a private, read-only diagnostic interface protected by `Authorization: Bearer <CONFIGURATION_MONITOR_TOKEN>`. It returns issue codes, never API keys, bearer tokens or customer payloads. It checks local configuration and, when local checks pass, the remote Price and active tax registrations. Its `live_ready` is always false because live fulfillment is absent.
+The built-in rule checks run on every Checkout request. `GET /api/configuration-status` is a private, read-only diagnostic interface protected by `Authorization: Bearer <CONFIGURATION_MONITOR_TOKEN>`. It returns issue codes, never API keys, bearer tokens or customer payloads. It checks local configuration and, when local checks pass, the remote Price and active tax registrations. A successful `configuration_valid` result is not an end-to-end Checkout test: Dashboard terms settings, redirects and fulfillment still need verification. Its `live_ready` is always false because live fulfillment is absent.
 
 This is a deterministic guard, **not a connected AI model**. No internal engine URL, credentials or verified running engine were found in the repository. An internal assistant can consume this endpoint from its server once its application and authentication method are identified. Do not expose the bearer token in the browser, give a model payment-write privileges, or treat generated advice as permission to change financial records. No autonomous repair service, model subscription, scheduled poller or alerts have been deployed.
 

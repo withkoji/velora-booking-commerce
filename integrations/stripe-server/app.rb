@@ -61,10 +61,11 @@ module Velora
       issues = config.problems
       issues += config.remote_problems(Stripe::StripeClient.new(ENV.fetch("STRIPE_SECRET_KEY"))) if issues.empty?
       status issues.empty? ? 200 : 503
-      JSON.generate(mode: "sandbox", checkout_ready: issues.empty?, issues: issues,
+      JSON.generate(mode: "sandbox", configuration_valid: issues.empty?, issues: issues,
+                    checkout_status: "requires_end_to_end_verification",
                     live_ready: false, fulfillment: "not_implemented", ai_engine_connected: false)
     rescue Stripe::StripeError
-      halt 503, JSON.generate(checkout_ready: false, issues: ["stripe_configuration_check_failed"], live_ready: false)
+      halt 503, JSON.generate(configuration_valid: false, issues: ["stripe_configuration_check_failed"], live_ready: false)
     end
 
     post "/api/create-checkout-session" do

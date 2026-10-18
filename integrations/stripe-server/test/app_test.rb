@@ -214,9 +214,9 @@ class WebhookTest < Minitest::Test
     header "Authorization", nil
   end
 
-  def checkout_client(sessions, registrations: [Object.new])
+  def checkout_client(sessions, registrations: [Object.new], amount: 2500)
     recurring = Struct.new(:interval, :interval_count).new("month", 1)
-    price = Struct.new(:active, :livemode, :currency, :unit_amount, :recurring).new(true, false, "usd", 2500, recurring)
+    price = Struct.new(:active, :livemode, :currency, :unit_amount, :recurring).new(true, false, "usd", amount, recurring)
     prices = Object.new
     prices.define_singleton_method(:retrieve) { |*| price }
     registration_service = Object.new
@@ -336,6 +336,33 @@ class WebhookTest < Minitest::Test
         assert_equal false, response["live_ready"]
         refute_includes last_response.body, ENV["STRIPE_SECRET_KEY"]
         refute_includes last_response.body, ENV["CONFIGURATION_MONITOR_TOKEN"]
+      end
+    end
+  end
+
+  def test_incorrect_membership_amount_blocks_session_creation
+    sessions = Object.new
+    def sessions.create(*) = raise("Must not create a Session")
+    with_checkout_environment(key: "sk_test_fixture") do
+      Stripe::StripeClient.stub(:new, checkout_client(sessions, amount: 9500)) do
+        post "/api/create-checkout-session"
+        assert_equal 503, last_response.status
+        assert_includes response["issues"], "membership_price_mismatch"
+      end
+    end
+  end
+
+  def test_monitor_does_not_claim_end_to_end_readiness
+    with_checkout_environment(key: "sk_test_fixture") do
+      header "Authorization", "Bearer #{ENV.fetch('CONFIGURATION_MONITOR_TOKEN')}"
+      Stripe::StripeClient.stub(:new, checkout_client(Object.new)) do
+        get "/api/configuration-status"
+        assert_equal 200, last_response.status
+        assert_equal true, response["configuration_valid"]
+        assert_equal "requires_end_to_end_verification", response["checkout_status"]
+        assert_equal false, response["live_ready"]
+        assert_equal false, response["ai_engine_connected"]
+        refute response.key?("checkout_ready")
       end
     end
   end
