@@ -1,97 +1,103 @@
 # Stripe Integration TODO
 
-This is the single source of truth for remaining Checkout setup.
+Single source of truth for remaining VELORA Checkout setup. Updated October 17, 2026 (America/Indianapolis).
 
-## Status
+## Current status
 
-October 17 configuration alignment: existing Checkout Session parameters now match the attached Checkout Studio Field Intents, including branding. Only Session parameters and this setup checklist were changed. Ruby is unavailable in the editing environment, so syntax and regression tests were not run; run the test command below and verify a real sandbox Session before release.
+The Ruby/Sinatra sandbox Checkout endpoint already existed. It now validates its configuration and the selected Stripe Price before creating a Session, requires a stable Idempotency-Key, and checks for an active Stripe Tax registration. Live keys and live webhook events remain blocked. This service records webhook receipts only: booking confirmation, membership activation and credits are not implemented.
 
-Scenario B: a scan of the repository found no Checkout Session creation call. A minimal `POST /api/create-checkout-session` endpoint now uses the existing Ruby/Sinatra server and StripeClient. No new framework, middleware, webhook handler, or datastore was added.
+### Verified account findings
 
-The endpoint creates a subscription Session for the customer Wellness Membership and redirects to hosted Checkout with HTTP 303. It is sandbox-only: missing keys and live keys are rejected before any API call. This is a test integration, not a production booking or membership fulfillment system. Existing Shopify/Apntly bookings retain their designated payment route.
+- Connected account: **VELORA BY SJ sandbox**, `acct_1URDvdHiYWtYXjrY` (test mode).
+- Created one sandbox-only test product: `velora_wellness_membership_sandbox`.
+- Its real recurring Price is **`price_1URhWEHiYWtYXjrYcfiJ4bBE`**, USD 25/month, exclusive tax. This is not a live Price.
+- No active tax registrations were returned. No registration was invented or created.
+- Stripe rejected the supplied branding file `file_1URKb8HHtpUU8BercuOZWrYp` as nonexistent in this account. The broken icon reference was removed; the supplied colors, font and rounded border remain.
+- A second sandbox API validation request was rejected because the account has no Terms of Service URL configured in its Dashboard. No Checkout Session or payment was successfully created by these checks.
+- The meaningless custom terms message `t` was removed. Stripe's standard required-consent wording is used.
+- The receipt URL returned HTTP 403 to the verification client; its functionality is unverified. The storefront policy route returned HTML, but its policy content still needs business review.
+- The owner identified the deployed service as using another hosting service, not the connected Render workspace. Its actual hosting/application link has not been supplied.
 
-## Values to Replace
+## Values to configure
 
-The following values are placeholders and must be updated before going live.
+**Files:** [app.rb](integrations/stripe-server/app.rb), [checkout_configuration.rb](integrations/stripe-server/checkout_configuration.rb), [.env.example](integrations/stripe-server/.env.example).
 
-**Files containing placeholders:**
-- [integrations/stripe-server/app.rb](integrations/stripe-server/app.rb)
-- [integrations/stripe-server/.env.example](integrations/stripe-server/.env.example)
+All sensitive values belong in the hosting platform's server-side secret store. Do not paste keys into chat or commit them.
 
-| Field | Current Value | What to Set |
-|-------|---------------|-------------|
-| mode | `subscription` | Chosen for the recurring Wellness Membership. Use `payment` only for a separate one-time product; the conditional excludes payment_method_collection in payment mode. |
-| success_url | `#{domain}/success?session_id={CHECKOUT_SESSION_ID}` | Your real success page via server-side DOMAIN. Keep the `{CHECKOUT_SESSION_ID}` template. No success page is implemented here. |
-| cancel_url | `domain` | Your real return page via server-side DOMAIN. |
-| line_items[].price | `price_...` | Your sandbox recurring Stripe Price ID from https://dashboard.stripe.com/prices; confirm USD 25/month for this membership. |
-| DOMAIN | `http://localhost:3000` | Local frontend origin for testing; use the actual HTTPS frontend origin for deployment. |
+| Variable | Required value / action |
+| --- | --- |
+| STRIPE_MODE | `sandbox` only |
+| STRIPE_SECRET_KEY | Restricted sandbox key with Checkout write, Prices read and Tax registration read access; use a key for the verified sandbox account above |
+| STRIPE_MEMBERSHIP_PRICE_ID | `price_1URhWEHiYWtYXjrYcfiJ4bBE` for this sandbox; the code no longer contains `price_...` |
+| STRIPE_SUCCESS_URL | An implemented and tested receipt/success URL containing `{CHECKOUT_SESSION_ID}`; proposed owner URL: `https://billing.viviarental.online/receipt?checkout_session={CHECKOUT_SESSION_ID}` (unverified) |
+| STRIPE_CANCEL_URL | An implemented and tested return page; proposed storefront: `https://book.viviarental.online` |
+| STRIPE_TERMS_URL | Business-approved public terms URL; also set the same URL in Stripe Dashboard public business details. This variable does not configure Stripe's Dashboard. |
+| STRIPE_WEBHOOK_SECRET | Signing secret for this exact deployed sandbox webhook destination |
+| EVENT_DATABASE_PATH | Absolute persistent SQLite path for existing webhook receipts |
+| CONFIGURATION_MONITOR_TOKEN | Random server-side bearer secret, at least 32 characters, for the internal diagnostic reader |
+| PUBLIC_HOSTNAME | Actual service hostname if it is not localhost or the automatically supplied Render hostname; hostname only, no scheme/path |
+| STRIPE_ALLOWED_ACCOUNTS | Approved connected-account IDs only when needed; empty accepts platform events only |
 
-There are no real Price IDs or approved frontend URLs embedded in this change. The placeholder Price ID must be replaced before a real sandbox checkout can succeed.
+`DOMAIN` is no longer used: redirects have explicit required variables to avoid accidentally redirecting deployed users to localhost. The service rejects non-local HTTP URLs, embedded credentials, fragments, invalid URLs and success URLs missing the session template.
 
-## Configured Parameters
+## Configured Checkout parameters
 
-These are the exact Checkout Studio settings, with the requested SDK-specific ui_mode adjustment.
-
-**File containing these parameters:**
-- [integrations/stripe-server/app.rb](integrations/stripe-server/app.rb)
+**File:** [app.rb](integrations/stripe-server/app.rb).
 
 | Parameter | Value |
-|-----------|-------|
-| ui_mode | `hosted` — Gemfile constrains Stripe Ruby to `~> 19.6`, below 21.0.0 |
+| --- | --- |
+| ui_mode | `hosted`, following the supplied versioning rule for Ruby gem `~> 19.6`; verify acceptance against the resolved SDK/API before release |
+| mode | `subscription` |
 | billing_address_collection | `required` |
 | phone_number_collection.enabled | `true` |
-| automatic_tax.enabled | `true` |
+| automatic_tax.enabled | `true`; Session creation is blocked while no active registration is returned |
 | allow_promotion_codes | `false` |
-| payment_method_collection | `always`, included only when mode is subscription |
+| payment_method_collection | `always`, subscription mode only |
 | submit_type | `auto` |
-| tax_id_collection.enabled | `true` |
-| tax_id_collection.required | `if_supported` |
+| tax_id_collection | enabled, required `if_supported` |
 | consent_collection.terms_of_service | `required` |
-| custom_text.terms_of_service_acceptance.message | `t` |
 | name_collection.individual.enabled | `true` |
 | locale | `en` |
-| branding_settings.background_color | `#0C0702` |
-| branding_settings.button_color | `#5B4D31` |
-| branding_settings.font_family | `default` |
-| branding_settings.border_style | `rounded` |
-| branding_settings.icon | file `file_1URKb8HHtpUU8BercuOZWrYp` |
+| branding_settings | background `#0C0702`, button `#5B4D31`, font `default`, border `rounded` |
 | integration_identifier | `hosted_mobile_app_0002` |
 | origin_context | `mobile_app` |
+| success_url / cancel_url / line_items[].price | Required server-owned environment values above |
 
-The text `t` is preserved exactly as supplied, not substituted with an invented policy. Review it in Checkout Studio before public use. The supplied branding settings are included exactly; the unrequested saved-payment-method option is removed. Confirm the icon file exists in the same sandbox account used by the endpoint. The Stripe API version is not explicitly set. There is no Gemfile.lock in the repository; dependency resolution and actual API acceptance must be verified in the sandbox. If upgrading to SDK 21+, change ui_mode to hosted_page according to the requested versioning rule.
+No payment method allowlist, unrequested saved-payment-method option, broken branding file, or custom message `t` is sent. The Stripe client API version is not overridden.
 
-## Setup and Next Steps
+## Required setup and tests
 
-1. Use Ruby 3.3+ and Bundler. In `integrations/stripe-server`, run `bundle install`. The existing Gemfile already declares Stripe, Sinatra, Puma, dotenv, SQLite and test dependencies.
-2. Copy `.env.example` to a local `.env` in that directory, which the existing dotenv loader reads. Set STRIPE_SECRET_KEY to a restricted sandbox API key with the required Checkout/subscription permissions (or a sandbox secret key). The code and example use the same variable names. Never commit credentials. No browser or Vite variables are needed.
-3. Keep STRIPE_MODE=sandbox. Retain existing STRIPE_WEBHOOK_SECRET and absolute EVENT_DATABASE_PATH configuration; the existing server startup still requires them. No new hosting resources or webhook registrations are created.
-4. Replace the placeholder recurring Price ID and DOMAIN. Enable the required payment methods and configure the business Terms of Service URL in the sandbox Dashboard.
-5. Verify Stripe Tax configuration, applicable product tax code/tax behavior, and active registrations in jurisdictions where collection is required. automatic_tax.enabled alone does not establish registration or guarantee tax collection. Production registrations were not verified by this code change.
-6. Run `bundle exec ruby -Itest test/app_test.rb`. Checkout tests mock Stripe; they do not make purchases. The PR workflow also runs this test file.
-7. From an allowed host, POST to `/api/create-checkout-session`; the server creates a Session and responds with a 303 redirect to Stripe. Client-submitted prices, URLs and mode are ignored. Use a browser form or navigate to the returned Location. No frontend files are introduced.
-8. In the sandbox use `4242 4242 4242 4242`, any future expiry and any three-digit CVC. Test decline with `4000 0000 0000 0002`, and authentication with `4000 0025 0000 3155`. Never use real card data in testing. Confirm all requested fields are accepted by the resolved SDK/API and shown as expected.
-9. The 30-day trial is NOT activated by this endpoint: trial parameters were absent from the supplied Field Intents. Configure an approved trial separately before advertising a trial through this endpoint. Customer membership benefits also remain to be defined.
-10. Existing webhooks verify signatures and persist sandbox receipts only. Before granting membership access, implement verified customer/subscription association, invoice-paid/failed and subscription lifecycle handling, durable fulfillment/retries and reconciliation. Do not grant access from a redirect or assume receipt means fulfillment. This datastore has no existing customer/subscription persistence pattern, so none was invented.
-11. Public rollout remains pending application authorization/rate limits, retry/idempotency design for Session creation, approved policy text, verified billing/tax settings, complete fulfillment tests and explicit release approval. The endpoint intentionally rejects live keys. Keep it separate from existing Shopify/Apntly booking payments.
+1. Identify the actual deployed hosting service/application. Deploy the tested `main` source there and configure the variables above. The existing Render Blueprint is a separate deployment option, not evidence of a deployed service; do not provision it as a second payment path by accident.
+2. Publish and review the real terms policy and set its URL under Stripe Dashboard public business details. Keep required consent enabled.
+3. Resolve the tax setup with the business's actual registration information. A Stripe registration records an existing registration; it does not register the business with a government. The runtime checks for at least one active registration, which does not prove coverage of every customer jurisdiction or product classification. Do not switch off tax as a workaround or invent a registration.
+4. Run the complete Ruby suite in `integrations/stripe-server`: `bundle install`, then `bundle exec ruby -Itest -e 'Dir.glob("test/**/*_test.rb").sort.each { |file| require File.expand_path(file) }'`. GitHub Actions now runs this on main pushes and pull requests. The CI workflow also supports manual dispatch.
+5. POST `/api/create-checkout-session` from the approved application with an `Idempotency-Key` header containing 16–128 letters, digits or hyphens. Keep it stable for retries of one checkout attempt; use a new unpredictable key for each distinct attempt. The key is sent to Stripe with a VELORA prefix. Client-supplied prices and redirect URLs are ignored.
+6. Configuration issues return 503 with safe issue codes before Session creation. Missing/invalid idempotency headers return 400. Stripe errors return a sanitized 502. Do not interpret these statuses as payment success.
+7. After setup, complete a real sandbox checkout using `4242 4242 4242 4242`, a future expiry and a three-digit CVC. Test declines, authentication and duplicate requests. No real card data. Confirm price, consent, branding, required fields and the return page against the actual SDK/API.
+8. Test signed webhook delivery to the deployed `/api/webhook`, duplicate delivery and persistence after restart. Receipt logging must continue to leave `booking_updated: false`. Payments must never confirm an appointment without authoritative booking verification.
+9. Before public or live rollout, implement customer authorization, rate limits, customer/subscription association, verified invoice/subscription lifecycle handling, fulfillment retries, membership entitlements and business reconciliation. The prior 30-day trial is not implemented by this endpoint. Keep Shopify/Apntly bookings on their designated payment route.
 
-## Project Structure
+## Internal configuration monitor / AI connection
 
-No new server files or infrastructure were added. Modified files:
-- [integrations/stripe-server/app.rb](integrations/stripe-server/app.rb): one Checkout endpoint; existing receipt handlers unchanged.
-- [integrations/stripe-server/.env.example](integrations/stripe-server/.env.example): adds server-only STRIPE_SECRET_KEY and DOMAIN.
-- [integrations/stripe-server/test/app_test.rb](integrations/stripe-server/test/app_test.rb): sandbox-key guard, server-owned parameters/redirect and sanitized API error tests; existing webhook regression tests retained.
-- [docs/stripe-deployment-setup.md](docs/stripe-deployment-setup.md): points Checkout setup here.
-- This TODO replaces the stale statement that no server framework exists.
+The built-in rule checks run on every Checkout request. `GET /api/configuration-status` is a private, read-only diagnostic interface protected by `Authorization: Bearer <CONFIGURATION_MONITOR_TOKEN>`. It returns issue codes, never API keys, bearer tokens or customer payloads. It checks local configuration and, when local checks pass, the remote Price and active tax registrations. Its `live_ready` is always false because live fulfillment is absent.
 
-## Flow Overview
+This is a deterministic guard, **not a connected AI model**. No internal engine URL, credentials or verified running engine were found in the repository. An internal assistant can consume this endpoint from its server once its application and authentication method are identified. Do not expose the bearer token in the browser, give a model payment-write privileges, or treat generated advice as permission to change financial records. No autonomous repair service, model subscription, scheduled poller or alerts have been deployed.
 
-Browser POST → Sinatra → sandbox StripeClient → subscription Checkout Session → HTTP 303 to hosted Checkout → existing signed webhook receipt. Business fulfillment and order/membership tracking remain unimplemented; the receipt ledger stores only event/object references, not customer/subscription models.
+## Files changed for hardening
+
+- [app.rb](integrations/stripe-server/app.rb): guards, private diagnostics and Stripe idempotency; existing webhook verification and receipt semantics preserved.
+- [checkout_configuration.rb](integrations/stripe-server/checkout_configuration.rb): local and remote configuration rules.
+- [.env.example](integrations/stripe-server/.env.example): required variable names without secret values.
+- [app_test.rb](integrations/stripe-server/test/app_test.rb) and [checkout_configuration_test.rb](integrations/stripe-server/test/checkout_configuration_test.rb): failed configuration, authorization, secret redaction, idempotency and existing webhook regression coverage.
+- [stripe-sandbox.yml](.github/workflows/stripe-sandbox.yml): all Ruby tests on main/PR/manual runs.
+- [policy-validator-cfn.yml](.github/workflows/policy-validator-cfn.yml): restrict the unused AWS sample to CloudFormation changes. Its example AWS credentials/template fields still require real setup if CloudFormation is introduced; it is not a Stripe deployment check.
 
 ## Resources
 
+- https://dashboard.stripe.com/settings/business-details?edit=public
+- https://dashboard.stripe.com/settings/tax
+- https://docs.stripe.com/checkout/quickstart
+- https://docs.stripe.com/testing
+- https://docs.stripe.com/webhooks
 - https://support.stripe.com
 - https://docs.stripe.com/mcp
-- https://docs.stripe.com/checkout/quickstart
-- https://docs.stripe.com/billing/subscriptions/trials
-- https://docs.stripe.com/testing
-- https://docs.stripe.com/tax/registering

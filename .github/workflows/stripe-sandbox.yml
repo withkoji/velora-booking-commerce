@@ -21,4 +21,4 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
           working-directory: integrations/stripe-server
-      - run: bundle exec ruby -Itest test/app_test.rb
+      - run: bundle exec ruby -Itest -e 'Dir.glob("test/**/*_test.rb").sort.each { |file| require File.expand_path(file) }'

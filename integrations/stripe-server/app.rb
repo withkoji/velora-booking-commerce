@@ -3,6 +3,7 @@ require "sinatra/base"
 require "stripe"
 require "json"
 require_relative "event_store"
+require_relative "checkout_configuration"
 
 module Velora
   class App < Sinatra::Base
@@ -48,15 +49,36 @@ module Velora
       JSON.generate(status: "ok", mode: "sandbox", booking_sync: "not_implemented")
     end
 
+    # Private, read-only interface for an internal monitoring/assistant service.
+    # The bearer token belongs only in that service's server-side secret store.
+    get "/api/configuration-status" do
+      token = ENV["CONFIGURATION_MONITOR_TOKEN"].to_s
+      supplied = request.env["HTTP_AUTHORIZATION"].to_s.delete_prefix("Bearer ")
+      halt 503, JSON.generate(error: "Monitor not configured") if token.length < 32
+      halt 401, JSON.generate(error: "Unauthorized") unless request.env["HTTP_AUTHORIZATION"].to_s.start_with?("Bearer ") &&
+        Rack::Utils.secure_compare(supplied, token)
+      config = CheckoutConfiguration.new
+      issues = config.problems
+      issues += config.remote_problems(Stripe::StripeClient.new(ENV.fetch("STRIPE_SECRET_KEY"))) if issues.empty?
+      status issues.empty? ? 200 : 503
+      JSON.generate(mode: "sandbox", checkout_ready: issues.empty?, issues: issues,
+                    live_ready: false, fulfillment: "not_implemented", ai_engine_connected: false)
+    rescue Stripe::StripeError
+      halt 503, JSON.generate(checkout_ready: false, issues: ["stripe_configuration_check_failed"], live_ready: false)
+    end
+
     post "/api/create-checkout-session" do
       # This receiver has no customer authorization/fulfillment layer yet.
       # Keep Checkout sandbox-only; prices and redirects are server-owned.
-      key = ENV["STRIPE_SECRET_KEY"].to_s
-      halt 503, JSON.generate(error: "Sandbox Checkout not configured") unless
-        ENV.fetch("STRIPE_MODE", "sandbox") == "sandbox" && key.match?(/\A(?:sk|rk)_test_/)
-
-      client = Stripe::StripeClient.new(key)
-      domain = ENV.fetch("DOMAIN", "http://localhost:3000")
+      config = CheckoutConfiguration.new
+      issues = config.problems
+      halt 503, JSON.generate(error: "Checkout configuration incomplete", issues: issues) unless issues.empty?
+      idempotency_key = request.env["HTTP_IDEMPOTENCY_KEY"].to_s
+      halt 400, JSON.generate(error: "A stable Idempotency-Key header (16–128 letters, digits or hyphens) is required") unless
+        idempotency_key.match?(/\A[a-zA-Z0-9-]{16,128}\z/)
+      client = Stripe::StripeClient.new(ENV.fetch("STRIPE_SECRET_KEY"))
+      issues = config.remote_problems(client)
+      halt 503, JSON.generate(error: "Checkout configuration incomplete", issues: issues) unless issues.empty?
       mode = "subscription" # Recurring VELORA Wellness Membership.
       session_params = {
         ui_mode: "hosted", # Gemfile pins stripe ~> 19.6 (< 21.0.0).
@@ -68,24 +90,22 @@ module Velora
         submit_type: "auto",
         tax_id_collection: { enabled: true, required: "if_supported" },
         consent_collection: { terms_of_service: "required" },
-        custom_text: { terms_of_service_acceptance: { message: "t" } },
         name_collection: { individual: { enabled: true } },
         locale: "en",
         branding_settings: {
           background_color: "#0C0702",
           button_color: "#5B4D31",
           font_family: "default",
-          border_style: "rounded",
-          icon: { type: "file", file: "file_1URKb8HHtpUU8BercuOZWrYp" }
+          border_style: "rounded"
         },
         integration_identifier: "hosted_mobile_app_0002",
         origin_context: "mobile_app",
-        success_url: "#{domain}/success?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url: domain,
-        line_items: [{ price: "price_...", quantity: 1 }]
+        success_url: config.success_url,
+        cancel_url: config.cancel_url,
+        line_items: [{ price: config.price_id, quantity: 1 }]
       }
       session_params[:payment_method_collection] = "always" if mode == "subscription"
-      session = client.v1.checkout.sessions.create(session_params)
+      session = client.v1.checkout.sessions.create(session_params, { idempotency_key: "velora-membership-#{idempotency_key}" })
       redirect session.url, 303
     rescue Stripe::StripeError
       halt 502, JSON.generate(error: "Checkout unavailable; review server configuration")

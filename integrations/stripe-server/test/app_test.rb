@@ -197,14 +197,33 @@ class WebhookTest < Minitest::Test
   end
 
   def with_checkout_environment(key: nil, mode: "sandbox")
-    names = %w[STRIPE_SECRET_KEY STRIPE_MODE DOMAIN]
+    names = %w[STRIPE_SECRET_KEY STRIPE_MODE STRIPE_MEMBERSHIP_PRICE_ID STRIPE_SUCCESS_URL STRIPE_CANCEL_URL STRIPE_TERMS_URL CONFIGURATION_MONITOR_TOKEN]
     previous = names.to_h { |name| [name, ENV[name]] }
     key ? ENV["STRIPE_SECRET_KEY"] = key : ENV.delete("STRIPE_SECRET_KEY")
     ENV["STRIPE_MODE"] = mode
-    ENV["DOMAIN"] = "https://checkout.example.invalid"
+    ENV["STRIPE_MEMBERSHIP_PRICE_ID"] = "price_fixture"
+    ENV["STRIPE_SUCCESS_URL"] = "https://checkout.velora.test/receipt?checkout_session={CHECKOUT_SESSION_ID}"
+    ENV["STRIPE_CANCEL_URL"] = "https://checkout.velora.test"
+    ENV["STRIPE_TERMS_URL"] = "https://checkout.velora.test/terms"
+    ENV["CONFIGURATION_MONITOR_TOKEN"] = "monitor-fixture-token-for-tests-only-123456"
+    header "Idempotency-Key", "fixture-checkout-12345678"
     yield
   ensure
     previous.each { |name, value| value ? ENV[name] = value : ENV.delete(name) }
+    header "Idempotency-Key", nil
+    header "Authorization", nil
+  end
+
+  def checkout_client(sessions, registrations: [Object.new])
+    recurring = Struct.new(:interval, :interval_count).new("month", 1)
+    price = Struct.new(:active, :livemode, :currency, :unit_amount, :recurring).new(true, false, "usd", 2500, recurring)
+    prices = Object.new
+    prices.define_singleton_method(:retrieve) { |*| price }
+    registration_service = Object.new
+    registration_service.define_singleton_method(:list) { |*| Struct.new(:data).new(registrations) }
+    v1 = Struct.new(:checkout, :prices, :tax).new(Struct.new(:sessions).new(sessions), prices,
+      Struct.new(:registrations).new(registration_service))
+    Struct.new(:v1).new(v1)
   end
 
   def test_checkout_fails_closed_without_test_key
@@ -224,13 +243,14 @@ class WebhookTest < Minitest::Test
 
   def test_checkout_creates_server_owned_subscription_and_redirects
     captured = nil
+    captured_options = nil
     sessions = Object.new
-    sessions.define_singleton_method(:create) do |params|
+    sessions.define_singleton_method(:create) do |params, options|
       captured = params
+      captured_options = options
       Struct.new(:url).new("https://checkout.stripe.com/c/pay/cs_test_fixture")
     end
-    checkout = Struct.new(:sessions).new(sessions)
-    client = Struct.new(:v1).new(Struct.new(:checkout).new(checkout))
+    client = checkout_client(sessions)
     with_checkout_environment(key: "sk_test_fixture") do
       Stripe::StripeClient.stub(:new, ->(key) { assert_equal "sk_test_fixture", key; client }) do
         post "/api/create-checkout-session", { price: "price_attacker", success_url: "https://attacker.invalid" }
@@ -241,10 +261,12 @@ class WebhookTest < Minitest::Test
     assert_equal "subscription", captured[:mode]
     assert_equal "hosted", captured[:ui_mode]
     assert_equal "always", captured[:payment_method_collection]
-    assert_equal [{ price: "price_...", quantity: 1 }], captured[:line_items]
-    assert_equal "https://checkout.example.invalid/success?session_id={CHECKOUT_SESSION_ID}", captured[:success_url]
-    assert_equal "https://checkout.example.invalid", captured[:cancel_url]
-    assert_equal "t", captured.dig(:custom_text, :terms_of_service_acceptance, :message)
+    assert_equal [{ price: "price_fixture", quantity: 1 }], captured[:line_items]
+    assert_equal "https://checkout.velora.test/receipt?checkout_session={CHECKOUT_SESSION_ID}", captured[:success_url]
+    assert_equal "https://checkout.velora.test", captured[:cancel_url]
+    assert_equal "velora-membership-fixture-checkout-12345678", captured_options[:idempotency_key]
+    refute captured.key?(:custom_text)
+    refute captured[:branding_settings].key?(:icon)
     assert_equal true, captured.dig(:automatic_tax, :enabled)
     assert_equal "if_supported", captured.dig(:tax_id_collection, :required)
     assert_equal "hosted_mobile_app_0002", captured[:integration_identifier]
@@ -255,12 +277,65 @@ class WebhookTest < Minitest::Test
   def test_checkout_api_errors_do_not_expose_details
     sessions = Object.new
     def sessions.create(*) = raise(Stripe::StripeError, "sensitive provider detail")
-    client = Struct.new(:v1).new(Struct.new(:checkout).new(Struct.new(:sessions).new(sessions)))
+    client = checkout_client(sessions)
     with_checkout_environment(key: "rk_test_fixture") do
       Stripe::StripeClient.stub(:new, client) do
         post "/api/create-checkout-session"
         assert_equal 502, last_response.status
         refute_includes last_response.body, "sensitive provider detail"
+      end
+    end
+  end
+
+  def test_missing_configuration_never_calls_stripe
+    with_checkout_environment(key: "sk_test_fixture") do
+      ENV["STRIPE_MEMBERSHIP_PRICE_ID"] = "price_..."
+      Stripe::StripeClient.stub(:new, ->(*) { flunk "Must not call Stripe" }) do
+        post "/api/create-checkout-session"
+        assert_equal 503, last_response.status
+        assert_includes response["issues"], "membership_price_required"
+      end
+    end
+  end
+
+  def test_missing_idempotency_key_never_calls_stripe
+    with_checkout_environment(key: "sk_test_fixture") do
+      header "Idempotency-Key", nil
+      Stripe::StripeClient.stub(:new, ->(*) { flunk "Must not call Stripe" }) do
+        post "/api/create-checkout-session"
+        assert_equal 400, last_response.status
+      end
+    end
+  end
+
+  def test_missing_tax_registration_blocks_session_creation
+    sessions = Object.new
+    def sessions.create(*) = raise("Must not create a Session")
+    with_checkout_environment(key: "sk_test_fixture") do
+      Stripe::StripeClient.stub(:new, checkout_client(sessions, registrations: [])) do
+        post "/api/create-checkout-session"
+        assert_equal 503, last_response.status
+        assert_includes response["issues"], "active_tax_registration_required"
+      end
+    end
+  end
+
+  def test_monitor_requires_bearer_token_and_redacts_secrets
+    with_checkout_environment(key: "sk_test_fixture") do
+      Stripe::StripeClient.stub(:new, ->(*) { flunk "Unauthorized monitoring must not call Stripe" }) do
+        get "/api/configuration-status"
+        assert_equal 401, last_response.status
+        header "Authorization", ENV["CONFIGURATION_MONITOR_TOKEN"]
+        get "/api/configuration-status"
+        assert_equal 401, last_response.status
+      end
+      header "Authorization", "Bearer #{ENV.fetch('CONFIGURATION_MONITOR_TOKEN')}"
+      Stripe::StripeClient.stub(:new, checkout_client(Object.new, registrations: [])) do
+        get "/api/configuration-status"
+        assert_equal 503, last_response.status
+        assert_equal false, response["live_ready"]
+        refute_includes last_response.body, ENV["STRIPE_SECRET_KEY"]
+        refute_includes last_response.body, ENV["CONFIGURATION_MONITOR_TOKEN"]
       end
     end
   end
