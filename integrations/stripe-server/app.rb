@@ -84,22 +84,23 @@ module Velora
       session_params = {
         ui_mode: "hosted", # Gemfile pins stripe ~> 19.6 (< 21.0.0).
         mode: mode,
-        billing_address_collection: "required",
-        phone_number_collection: { enabled: true },
-        automatic_tax: { enabled: true },
+        billing_address_collection: "auto",
+        phone_number_collection: { enabled: false },
+        automatic_tax: { enabled: false },
         allow_promotion_codes: false,
-        submit_type: "auto",
-        tax_id_collection: { enabled: true, required: "if_supported" },
-        consent_collection: { terms_of_service: "required" },
+        submit_type: "book",
+        consent_collection: { terms_of_service: "required", promotions: "auto" },
         name_collection: { individual: { enabled: true } },
         locale: "en",
+        saved_payment_method_options: { payment_method_save: "enabled" },
         branding_settings: {
-          background_color: "#0C0702",
-          button_color: "#5B4D31",
+          background_color: "#0c0702",
+          button_color: "#5b4d31",
           font_family: "default",
-          border_style: "rounded"
+          border_style: "rounded",
+          icon: { type: "file", file: "file_1UWqQv2f2UX4QyfJFw9yJG4N" }
         },
-        integration_identifier: "hosted_mobile_app_0002",
+        integration_identifier: "hosted_mobile_app_0001",
         origin_context: "mobile_app",
         success_url: config.success_url,
         cancel_url: config.cancel_url,
