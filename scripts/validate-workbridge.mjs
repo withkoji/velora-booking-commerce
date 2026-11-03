@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+const base='apps/velora-workbridge/';
+for(const f of ['app.js','sw.js']) execFileSync(process.execPath,['--check',base+'dist/'+f]);
+const m=JSON.parse(fs.readFileSync(base+'dist/manifest.webmanifest','utf8'));
+for(const icon of m.icons)assert.ok(fs.existsSync(base+'dist'+icon.src));
+const html=fs.readFileSync(base+'dist/index.html','utf8');
+const refs=JSON.parse(fs.readFileSync(base+'RELATED_SOURCES.json','utf8'));
+for(const url of Object.values(refs.portals)) assert.ok(html.includes(url),url);
+assert.ok(!html.includes('STRIPE_SECRET_KEY'));
+console.log('WORKBRIDGE: syntax, icons and portal links passed.');

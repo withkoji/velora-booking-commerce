@@ -1,0 +1,15 @@
+name: WORKBRIDGE hub checks
+on:
+  pull_request:
+    paths: ['apps/velora-workbridge/**', 'scripts/validate-workbridge.mjs', '.github/workflows/workbridge-hub.yml']
+  push:
+    branches: [main, integration/velora-workbridge-hub]
+    paths: ['apps/velora-workbridge/**', 'scripts/validate-workbridge.mjs', '.github/workflows/workbridge-hub.yml']
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: node scripts/validate-workbridge.mjs

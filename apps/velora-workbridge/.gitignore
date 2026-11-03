@@ -1,0 +1,3 @@
+# The app is buildless: dist is its maintained deployable source.
+!dist/
+!dist/**
