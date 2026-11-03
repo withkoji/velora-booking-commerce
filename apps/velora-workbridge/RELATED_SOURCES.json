@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "target_repository": "withkoji/velora-workbridge",
+  "transfer_branch": "integration/velora-workbridge-hub",
+  "site_source_commit": "25aef3bb821538617e12b262b5e940c3c21eece8",
+  "live_site": "https://velora-workbridge-hub.parkerlane12706.chatgpt.site",
+  "sources": [
+    {
+      "repository": "withkoji/velora-booking-commerce",
+      "branch": "main",
+      "commit_sha": "dce312983b246b6c62316334d63e6913250c542c",
+      "files": [
+        {
+          "path": "README.md",
+          "blob_sha": "890e791f6b27b4425acb6153bdd3cb5da92553de",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/dce312983b246b6c62316334d63e6913250c542c/README.md"
+        },
+        {
+          "path": "database/README.md",
+          "blob_sha": "45fad82d60cb337e4e43467ab7031279a66e0a91",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/dce312983b246b6c62316334d63e6913250c542c/database/README.md"
+        },
+        {
+          "path": "docs/vivia-rentals-database.md",
+          "blob_sha": "eb26477628f365b2e018ca485f15b9f3208495e9",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/dce312983b246b6c62316334d63e6913250c542c/docs/vivia-rentals-database.md"
+        },
+        {
+          "path": "integrations/velora-shopify-zite/sync.mjs",
+          "blob_sha": "9df934accee0afe90fc2c4b8e9a5291bf7644141",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/dce312983b246b6c62316334d63e6913250c542c/integrations/velora-shopify-zite/sync.mjs"
+        }
+      ],
+      "relationship": "inherited_in_transfer_branch"
+    },
+    {
+      "repository": "withkoji/velora-booking-commerce",
+      "branch": "fix/stripe-sandbox-release-guards",
+      "commit_sha": "982ecdc6dda3b2eb34f1e06b99da1ae3b56e782f",
+      "files": [
+        {
+          "path": "integrations/stripe-server/app.rb",
+          "blob_sha": "5100c78d4b6823b308d91c0183aa96dd153d2a6d",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/982ecdc6dda3b2eb34f1e06b99da1ae3b56e782f/integrations/stripe-server/app.rb"
+        },
+        {
+          "path": "integrations/stripe-server/checkout_configuration.rb",
+          "blob_sha": "8cc18ba01bbd48ec1ab71828be38f6e36f5fa3ab",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/982ecdc6dda3b2eb34f1e06b99da1ae3b56e782f/integrations/stripe-server/checkout_configuration.rb"
+        },
+        {
+          "path": "docs/stripe-release-sequence.md",
+          "blob_sha": "d627b4249f7c4515c888a987fd92ddad0c407a62",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/982ecdc6dda3b2eb34f1e06b99da1ae3b56e782f/docs/stripe-release-sequence.md"
+        }
+      ],
+      "relationship": "inherited_in_transfer_branch"
+    },
+    {
+      "repository": "withkoji/velora-booking-commerce",
+      "branch": "integration/stripe-checkout-studio",
+      "commit_sha": "87b11ca17c1cd44563ee6142aeefdb033eed8eda",
+      "files": [
+        {
+          "path": "integrations/stripe-server/app.rb",
+          "blob_sha": "9510bb7a2487e69fc93d4bf23426c13fde005e3d",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/87b11ca17c1cd44563ee6142aeefdb033eed8eda/integrations/stripe-server/app.rb"
+        },
+        {
+          "path": "STRIPE_INTEGRATION_TODO.md",
+          "blob_sha": "826b268767f06ba51c00be8c1a8e091ca3464fc6",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/87b11ca17c1cd44563ee6142aeefdb033eed8eda/STRIPE_INTEGRATION_TODO.md"
+        }
+      ],
+      "relationship": "reference_only"
+    },
+    {
+      "repository": "withkoji/velora-booking-commerce",
+      "branch": "integration/stripe-deployment",
+      "commit_sha": "afb9a68cb62c252bdf0617078ec4b1a564004750",
+      "files": [
+        {
+          "path": "docs/stripe-deployment-setup.md",
+          "blob_sha": "5942cbcdd61ee56ed83ad143a998ab19f4e196b4",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/afb9a68cb62c252bdf0617078ec4b1a564004750/docs/stripe-deployment-setup.md"
+        },
+        {
+          "path": "integrations/stripe-server/render.yaml",
+          "blob_sha": "c520c5252b58509e3b34f342823154c4cad08f51",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/afb9a68cb62c252bdf0617078ec4b1a564004750/integrations/stripe-server/render.yaml"
+        }
+      ],
+      "relationship": "reference_only"
+    },
+    {
+      "repository": "withkoji/velora-booking-commerce",
+      "branch": "fix/velora-shopify-sync",
+      "commit_sha": "519d5cbb03887bc785f65885ba708327dcb09e93",
+      "files": [
+        {
+          "path": "integrations/velora-shopify-zite/sync.mjs",
+          "blob_sha": "9df934accee0afe90fc2c4b8e9a5291bf7644141",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/519d5cbb03887bc785f65885ba708327dcb09e93/integrations/velora-shopify-zite/sync.mjs"
+        },
+        {
+          "path": "docs/CNAME",
+          "blob_sha": "3f109f53a6b6d025ba3d235f2f1172836b52baf3",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/519d5cbb03887bc785f65885ba708327dcb09e93/docs/CNAME"
+        }
+      ],
+      "relationship": "reference_only"
+    },
+    {
+      "repository": "withkoji/velora-booking-commerce",
+      "branch": "setup/vivia-velora-foundation",
+      "commit_sha": "cee3cd77a25e67fa79b86317c31cc92f3090065a",
+      "files": [
+        {
+          "path": "api/core/booking.ts",
+          "blob_sha": "e90606bb7c8c37430456712b8cc99f0b36900025",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/cee3cd77a25e67fa79b86317c31cc92f3090065a/api/core/booking.ts"
+        },
+        {
+          "path": "api/core/authorization.ts",
+          "blob_sha": "da6822956c4c174e8ec1b66ecb49050c35d098c6",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/cee3cd77a25e67fa79b86317c31cc92f3090065a/api/core/authorization.ts"
+        },
+        {
+          "path": "api/core/payment.ts",
+          "blob_sha": "1f1fd25ff0308a48390e1b6de9acf940cb835732",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/cee3cd77a25e67fa79b86317c31cc92f3090065a/api/core/payment.ts"
+        },
+        {
+          "path": "integrations/hubspot/events.ts",
+          "blob_sha": "3b70e9c795a707f8f32f4ff0578d521f13fc1ff4",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/cee3cd77a25e67fa79b86317c31cc92f3090065a/integrations/hubspot/events.ts"
+        },
+        {
+          "path": "docs/architecture.md",
+          "blob_sha": "b3e75d68b45888ae2ceba4db27aa770ec95a817d",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/cee3cd77a25e67fa79b86317c31cc92f3090065a/docs/architecture.md"
+        },
+        {
+          "path": "docs/WIKI.md",
+          "blob_sha": "ab776ccdd62833a75eb0d5976f98cfb0f7af052a",
+          "url": "https://github.com/withkoji/velora-booking-commerce/blob/cee3cd77a25e67fa79b86317c31cc92f3090065a/docs/WIKI.md"
+        }
+      ],
+      "relationship": "reference_only"
+    }
+  ],
+  "related_repositories": [
+    {
+      "repository": "withkoji/openapi-stripe",
+      "commit_sha": "0fcde96d7bde2b5d82f32016cb410a4c5402a603",
+      "path": "velora/checkout-studio-profile.yaml",
+      "pull_request": "https://github.com/withkoji/openapi-stripe/pull/1"
+    },
+    {
+      "repository": "withkoji/ai-job-search",
+      "pull_request": "https://github.com/withkoji/ai-job-search/pull/2",
+      "relationship": "remote-search reference; not verified job eligibility"
+    }
+  ],
+  "portals": {
+    "wellness": "https://velorabysj.zite.so/",
+    "rentals": "https://viviarentalhomes.zite.so",
+    "careers": "https://workbridge.zite.so"
+  },
+  "integration_status": "Portal links only; live plugin data access is not enabled."
+}
