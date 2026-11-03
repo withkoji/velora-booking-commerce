@@ -86,7 +86,7 @@ module Velora
         mode: mode,
         billing_address_collection: "auto",
         phone_number_collection: { enabled: false },
-        automatic_tax: { enabled: false },
+        automatic_tax: { enabled: config.automatic_tax_enabled? },
         allow_promotion_codes: false,
         submit_type: "book",
         consent_collection: { terms_of_service: "required", promotions: "auto" },

@@ -16,9 +16,17 @@ jobs:
         working-directory: integrations/stripe-server
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: withkoji/openapi-stripe
+          ref: 0fcde96d7bde2b5d82f32016cb410a4c5402a603
+          path: stripe-profile-reference
+          persist-credentials: false
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
           bundler-cache: true
           working-directory: integrations/stripe-server
-      - run: bundle exec ruby -Itest -e 'Dir.glob("test/**/*_test.rb").sort.each { |file| require File.expand_path(file) }'
+      - env:
+          CHECKOUT_PROFILE_PATH: ${{ github.workspace }}/stripe-profile-reference/velora/checkout-studio-profile.yaml
+        run: bundle exec ruby -Itest -e 'Dir.glob("test/**/*_test.rb").sort.each { |file| require File.expand_path(file) }'
