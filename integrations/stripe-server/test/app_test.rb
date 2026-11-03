@@ -4,6 +4,7 @@ require "minitest/mock"
 require "rack/test"
 require "tmpdir"
 require "openssl"
+require "yaml"
 require_relative "../app"
 
 class WebhookTest < Minitest::Test
@@ -266,12 +267,19 @@ class WebhookTest < Minitest::Test
     assert_equal "https://checkout.velora.test", captured[:cancel_url]
     assert_equal "velora-membership-fixture-checkout-12345678", captured_options[:idempotency_key]
     refute captured.key?(:custom_text)
-    refute captured[:branding_settings].key?(:icon)
-    assert_equal true, captured.dig(:automatic_tax, :enabled)
-    assert_equal "if_supported", captured.dig(:tax_id_collection, :required)
-    assert_equal "hosted_mobile_app_0002", captured[:integration_identifier]
+    assert_equal "file_1UWqQv2f2UX4QyfJFw9yJG4N", captured.dig(:branding_settings, :icon, :file)
+    assert_equal false, captured.dig(:automatic_tax, :enabled)
+    refute captured.key?(:tax_id_collection)
+    assert_equal "hosted_mobile_app_0001", captured[:integration_identifier]
     assert_equal "mobile_app", captured[:origin_context]
     assert_equal false, captured[:allow_promotion_codes]
+    if ENV["CHECKOUT_PROFILE_PATH"]
+      profile = YAML.safe_load(File.read(ENV.fetch("CHECKOUT_PROFILE_PATH")))
+      actual = JSON.parse(JSON.generate(captured))
+      profile.fetch("checkout_session").fetch("fixed_by_ui").each do |field, expected|
+        assert_equal expected, actual.fetch(field), "Checkout profile drift: #{field}"
+      end
+    end
   end
 
   def test_checkout_api_errors_do_not_expose_details
@@ -308,15 +316,25 @@ class WebhookTest < Minitest::Test
     end
   end
 
-  def test_missing_tax_registration_blocks_session_creation
+  def test_tax_disabled_does_not_require_tax_api_permission
     sessions = Object.new
-    def sessions.create(*) = raise("Must not create a Session")
+    def sessions.create(*) = Struct.new(:url).new("https://checkout.stripe.com/c/pay/cs_test_fixture")
+    client = checkout_client(sessions, registrations: [])
+    client.v1.define_singleton_method(:tax) { raise "Tax API must not be called when automatic tax is disabled" }
     with_checkout_environment(key: "sk_test_fixture") do
-      Stripe::StripeClient.stub(:new, checkout_client(sessions, registrations: [])) do
+      Stripe::StripeClient.stub(:new, client) do
         post "/api/create-checkout-session"
-        assert_equal 503, last_response.status
-        assert_includes response["issues"], "active_tax_registration_required"
+        assert_equal 303, last_response.status
       end
+    end
+  end
+
+  def test_tax_enabled_still_requires_registration
+    config = Velora::CheckoutConfiguration.new
+    config.define_singleton_method(:automatic_tax_enabled?) { true }
+    with_checkout_environment(key: "sk_test_fixture") do
+      assert_includes config.remote_problems(checkout_client(Object.new, registrations: [])), "active_tax_registration_required"
+      assert_empty config.remote_problems(checkout_client(Object.new))
     end
   end
 
@@ -330,7 +348,7 @@ class WebhookTest < Minitest::Test
         assert_equal 401, last_response.status
       end
       header "Authorization", "Bearer #{ENV.fetch('CONFIGURATION_MONITOR_TOKEN')}"
-      Stripe::StripeClient.stub(:new, checkout_client(Object.new, registrations: [])) do
+      Stripe::StripeClient.stub(:new, checkout_client(Object.new, amount: 9500)) do
         get "/api/configuration-status"
         assert_equal 503, last_response.status
         assert_equal false, response["live_ready"]

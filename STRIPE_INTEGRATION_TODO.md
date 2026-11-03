@@ -73,7 +73,7 @@ The previously present `tax_id_collection` parameter was removed because it is a
 1. Configure the environment variables above in the actual deployed server secret store. Keep all Stripe secret material server-side.
 2. Confirm the Stripe account contains the configured branding file `file_1UWqQv2f2UX4QyfJFw9yJG4N` and that the account's public business details include the Terms of Service URL required by Checkout consent collection.
 3. Verify the recurring Price referenced by `STRIPE_MEMBERSHIP_PRICE_ID` is active and represents the intended membership product.
-4. Review [`integrations/stripe-server/checkout_configuration.rb`](integrations/stripe-server/checkout_configuration.rb): its existing `remote_problems` guard still requires an active Stripe Tax registration even though the Checkout Studio configuration now sets `automatic_tax.enabled` to `false`. That guard was intentionally not changed because Scenario A restricts this task to Checkout Session parameters plus this TODO file. Until separately reconciled, it can still block Checkout Session creation.
+4. The automatic-tax guard now follows the disabled automatic-tax profile; it does not query Tax registrations in this mode. This sandbox setting does not establish production tax readiness. Any future tax-enabled profile must retain active-registration validation.
 5. Run the Ruby test suite from `integrations/stripe-server`:
    `bundle install`
    `bundle exec ruby -Itest -e 'Dir.glob("test/**/*_test.rb").sort.each { |file| require File.expand_path(file) }'`
@@ -105,3 +105,7 @@ Updated files:
 - https://docs.stripe.com/webhooks
 - https://support.stripe.com
 - https://docs.stripe.com/mcp
+
+## Release gates (2026-11-03)
+
+See [Stripe release sequence](docs/stripe-release-sequence.md). Passing unit tests or configuration diagnostics is not sandbox acceptance or live readiness. Do not close #34 merely because a failed check has an owner.

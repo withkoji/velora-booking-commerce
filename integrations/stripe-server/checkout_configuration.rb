@@ -22,6 +22,10 @@ module Velora
     def success_url = @env["STRIPE_SUCCESS_URL"].to_s
     def cancel_url = @env["STRIPE_CANCEL_URL"].to_s
 
+    # Canonical Checkout profile disables automatic tax for this sandbox flow.
+    # A future tax-enabled profile must retain the registration guard below.
+    def automatic_tax_enabled? = false
+
     def remote_problems(client)
       issues = []
       price = client.v1.prices.retrieve(price_id)
@@ -31,8 +35,10 @@ module Velora
         issues << "membership_price_mismatch"
       end
       # A configured automatic_tax flag is not evidence of tax registration.
-      registrations = client.v1.tax.registrations.list({ status: "active", limit: 1 })
-      issues << "active_tax_registration_required" if registrations.data.empty?
+      if automatic_tax_enabled?
+        registrations = client.v1.tax.registrations.list({ status: "active", limit: 1 })
+        issues << "active_tax_registration_required" if registrations.data.empty?
+      end
       issues
     end
 
