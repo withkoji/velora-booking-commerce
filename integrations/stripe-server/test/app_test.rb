@@ -310,14 +310,16 @@ class WebhookTest < Minitest::Test
 
   def test_tax_disabled_checkout_does_not_require_registration
     sessions = Object.new
+    captured = nil
     sessions.define_singleton_method(:create) { |params, _options|
-      assert_equal false, params.dig(:automatic_tax, :enabled)
+      captured = params
       Struct.new(:url).new("https://checkout.stripe.com/c/pay/cs_test_fixture")
     }
     with_checkout_environment(key: "sk_test_fixture") do
       Stripe::StripeClient.stub(:new, checkout_client(sessions, registrations: [])) do
         post "/api/create-checkout-session"
         assert_equal 303, last_response.status
+        assert_equal false, captured.dig(:automatic_tax, :enabled)
       end
     end
   end
