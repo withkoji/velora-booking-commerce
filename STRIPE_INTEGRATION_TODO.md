@@ -73,7 +73,7 @@ The previously present `tax_id_collection` parameter was removed because it is a
 1. Configure the environment variables above in the actual deployed server secret store. Keep all Stripe secret material server-side.
 2. Confirm the Stripe account contains the configured branding file `file_1UWqQv2f2UX4QyfJFw9yJG4N` and that the account's public business details include the Terms of Service URL required by Checkout consent collection.
 3. Verify the recurring Price referenced by `STRIPE_MEMBERSHIP_PRICE_ID` is active and represents the intended membership product.
-4. Review [`integrations/stripe-server/checkout_configuration.rb`](integrations/stripe-server/checkout_configuration.rb): its existing `remote_problems` guard still requires an active Stripe Tax registration even though the Checkout Studio configuration now sets `automatic_tax.enabled` to `false`. That guard was intentionally not changed because Scenario A restricts this task to Checkout Session parameters plus this TODO file. Until separately reconciled, it can still block Checkout Session creation.
+4. The obsolete Stripe Tax registration guard was removed in `fix/stripe-tax-checkout-guard`, consistent with `automatic_tax.enabled: false`. Confirm the updated regression test passes before merging. This does not establish tax compliance; separately assess any applicable tax obligations.
 5. Run the Ruby test suite from `integrations/stripe-server`:
    `bundle install`
    `bundle exec ruby -Itest -e 'Dir.glob("test/**/*_test.rb").sort.each { |file| require File.expand_path(file) }'`
@@ -84,7 +84,7 @@ The previously present `tax_id_collection` parameter was removed because it is a
 
 ## Project Structure
 
-No new application files or routes were created for this change.
+No new application files or routes were created. A separate follow-up branch removes the obsolete tax-registration prerequisite and adds a regression test.
 
 Updated files:
 - [`integrations/stripe-server/app.rb`](integrations/stripe-server/app.rb) — Checkout Session parameters only.
@@ -105,3 +105,11 @@ Updated files:
 - https://docs.stripe.com/webhooks
 - https://support.stripe.com
 - https://docs.stripe.com/mcp
+
+## Verification update (2026-11-04)
+
+- Tax-disabled Checkout guard correction is proposed on branch `fix/stripe-tax-checkout-guard`; do not assume it is merged.
+- Run the GitHub Actions Stripe sandbox receiver test workflow and verify the result for the branch/PR.
+- Live charges remain unavailable according to the provided Stripe invoice error `livemode_charges_disabled`; resolve account activation with Stripe before any live rollout.
+- No real hosted Checkout session, successful test payment, membership provisioning, or live webhook fulfillment has been verified. This receiver remains sandbox-only and does not activate memberships.
+- After tests pass, perform an authorized end-to-end sandbox checkout using a real test recurring Price ID, valid redirect URLs, the configured branding file, and the required idempotency header. Verify signed webhook receipt and reconcile the session, customer, and subscription IDs. Do not grant access on an unpaid session.
