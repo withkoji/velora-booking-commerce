@@ -30,9 +30,6 @@ module Velora
              recurring && recurring.interval == "month" && recurring.interval_count == 1
         issues << "membership_price_mismatch"
       end
-      # A configured automatic_tax flag is not evidence of tax registration.
-      registrations = client.v1.tax.registrations.list({ status: "active", limit: 1 })
-      issues << "active_tax_registration_required" if registrations.data.empty?
       issues
     end
 

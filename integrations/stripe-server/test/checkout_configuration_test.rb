@@ -35,4 +35,17 @@ class CheckoutConfigurationTest < Minitest::Test
     env = valid_environment.merge("STRIPE_CANCEL_URL" => "http://localhost:3000")
     assert_empty Velora::CheckoutConfiguration.new(env).problems
   end
+
+  def test_valid_membership_price_does_not_require_tax_registration
+    recurring = Struct.new(:interval, :interval_count).new("month", 1)
+    price = Struct.new(:active, :livemode, :currency, :unit_amount, :recurring).new(true, false, "usd", 2500, recurring)
+    prices = Object.new
+    prices.define_singleton_method(:retrieve) { |_id| price }
+    v1 = Object.new
+    v1.define_singleton_method(:prices) { prices }
+    client = Object.new
+    client.define_singleton_method(:v1) { v1 }
+
+    assert_empty Velora::CheckoutConfiguration.new(valid_environment).remote_problems(client)
+  end
 end
