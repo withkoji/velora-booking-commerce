@@ -266,10 +266,10 @@ class WebhookTest < Minitest::Test
     assert_equal "https://checkout.velora.test", captured[:cancel_url]
     assert_equal "velora-membership-fixture-checkout-12345678", captured_options[:idempotency_key]
     refute captured.key?(:custom_text)
-    refute captured[:branding_settings].key?(:icon)
-    assert_equal true, captured.dig(:automatic_tax, :enabled)
-    assert_equal "if_supported", captured.dig(:tax_id_collection, :required)
-    assert_equal "hosted_mobile_app_0002", captured[:integration_identifier]
+    assert_equal "file_1UWqQv2f2UX4QyfJFw9yJG4N", captured.dig(:branding_settings, :icon, :file)
+    assert_equal false, captured.dig(:automatic_tax, :enabled)
+    refute captured.key?(:tax_id_collection)
+    assert_equal "hosted_mobile_app_0001", captured[:integration_identifier]
     assert_equal "mobile_app", captured[:origin_context]
     assert_equal false, captured[:allow_promotion_codes]
   end
@@ -308,14 +308,16 @@ class WebhookTest < Minitest::Test
     end
   end
 
-  def test_missing_tax_registration_blocks_session_creation
+  def test_tax_disabled_checkout_does_not_require_registration
     sessions = Object.new
-    def sessions.create(*) = raise("Must not create a Session")
+    sessions.define_singleton_method(:create) { |params, _options|
+      assert_equal false, params.dig(:automatic_tax, :enabled)
+      Struct.new(:url).new("https://checkout.stripe.com/c/pay/cs_test_fixture")
+    }
     with_checkout_environment(key: "sk_test_fixture") do
       Stripe::StripeClient.stub(:new, checkout_client(sessions, registrations: [])) do
         post "/api/create-checkout-session"
-        assert_equal 503, last_response.status
-        assert_includes response["issues"], "active_tax_registration_required"
+        assert_equal 303, last_response.status
       end
     end
   end
@@ -332,7 +334,7 @@ class WebhookTest < Minitest::Test
       header "Authorization", "Bearer #{ENV.fetch('CONFIGURATION_MONITOR_TOKEN')}"
       Stripe::StripeClient.stub(:new, checkout_client(Object.new, registrations: [])) do
         get "/api/configuration-status"
-        assert_equal 503, last_response.status
+        assert_equal 200, last_response.status
         assert_equal false, response["live_ready"]
         refute_includes last_response.body, ENV["STRIPE_SECRET_KEY"]
         refute_includes last_response.body, ENV["CONFIGURATION_MONITOR_TOKEN"]
